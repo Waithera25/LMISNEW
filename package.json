@@ -1,0 +1,10 @@
+{
+  "name": "lmis",
+  "version": "1.0.0",
+  "description": "Legal Management Information System (Affordable Housing Board)",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "start": "node build.js && npx serve public"
+  }
+}

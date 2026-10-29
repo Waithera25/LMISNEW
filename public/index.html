@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LMIS | Legal Management Information System</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1c2733;--mute:#6b7785;--brand:#1f5f4a;--brand2:#e8f2ee;--line:#e2e7ec;--warn:#b7791f;--bad:#b83232;--ok:#2f855a}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:9px 14px}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:var(--bad)}
+input,select,textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+#login{max-width:380px;margin:12vh auto;background:var(--card);padding:28px;border-radius:14px;box-shadow:0 6px 24px #0001}
+#login h1{margin:0 0 4px;font-size:22px;color:var(--brand)}
+#app{display:none;min-height:100vh}
+header{background:var(--brand);color:#fff;padding:12px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:17px;margin:0;flex:1}
+header input{max-width:300px}
+header .who{font-size:12px;opacity:.9}
+nav{display:flex;gap:4px;padding:10px 14px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line)}
+nav button{border:0;background:none;padding:8px 14px;border-radius:8px;color:var(--mute);white-space:nowrap}
+nav button.on{background:var(--brand2);color:var(--brand);font-weight:600}
+main{padding:18px;max-width:1100px;margin:auto}
+.bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.bar select{max-width:200px}.bar .sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--card);padding:16px;border-radius:12px;border:1px solid var(--line)}
+.stat b{font-size:28px;display:block}.stat span{color:var(--mute);font-size:13px}
+.tablewrap{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}
+tr.row{cursor:pointer}tr.row:hover{background:#f8fafb}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:#eef1f4}
+.tag.active,.tag.signing,.tag.pending,.tag.drafting{background:#fdf3dc;color:var(--warn)}
+.tag.resolved,.tag.signed,.tag.completed{background:#e1f3e8;color:var(--ok)}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;z-index:9}
+.modal .box{background:#fff;border-radius:14px;padding:22px;width:100%;max-width:560px}
+.modal h2{margin:0 0 6px;font-size:18px}
+.docs{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.docs a{display:block;padding:6px 0;color:var(--brand);cursor:pointer;text-decoration:underline}
+.profile-preview{width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block;margin:8px 0}
+.avatar{width:32px;height:32px;object-fit:cover;border-radius:50%;border:1px solid var(--line);vertical-align:middle;margin-right:8px}
+.avatar-fallback{display:inline-flex;align-items:center;justify-content:center;background:var(--brand2);color:var(--brand);font-weight:600}
+.acts{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+.msg{color:var(--bad);font-size:13px;margin-top:8px}
+.sr h3{margin:18px 0 6px;font-size:14px;color:var(--mute)}
+.sr div{background:#fff;border:1px solid var(--line);padding:10px 12px;border-radius:8px;margin-bottom:6px;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>LMIS</h1>
+  <div style="color:var(--mute);font-size:14px">Legal Management Information System</div>
+  <div id="nameWrap" style="display:none"><label>Full name</label><input id="fullName"></div>
+  <label>Email</label><input id="email" type="email">
+  <label>Password</label><input id="pass" type="password">
+  <div class="msg" id="loginMsg"></div>
+  <div class="acts" style="justify-content:space-between">
+    <button class="btn ghost" id="toggleMode">Create account</button>
+    <button class="btn" id="goBtn">Sign in</button>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>LMIS | Legal Department</h1>
+    <input id="gsearch" placeholder="Search cases, issues, lawyers, projects...">
+    <span class="who" id="who"></span>
+    <button class="btn ghost" id="logout">Sign out</button>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+
+<div class="modal" id="modal"><div class="box" id="box"></div></div>
+
+<script src="config.js"></script>
+<script>
+// Supabase details come from config.js, which is generated from your .env file (run: node build.js)
+const CFG = window.LMIS_CONFIG || {};
+const configured = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && !String(CFG.SUPABASE_URL).startsWith("YOUR_") && !String(CFG.SUPABASE_ANON_KEY).startsWith("YOUR_"));
+const sb = configured ? supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+const NOT_CONFIGURED = "Supabase is not set up yet. Put your URL and anon key in .env, run: node build.js, then reload.";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let me = null, db = {}, tab = "dashboard", signup = false;
+const canEdit = () => me && ["admin","lawyer"].includes(me.role);
+
+// ----- entity setup (one config drives every screen) -----
+const E = {
+  cases:{label:"Cases", table:"lmis_cases", docs:true, statusF:["active","pending","resolved"],
+    fields:[{k:"case_number",l:"Case number"},{k:"title",l:"Case title",req:1},{k:"court",l:"Court"},
+      {k:"status",l:"Status",t:"select",o:["active","pending","resolved"]},
+      {k:"date_filed",l:"Date filed",t:"date"},{k:"next_hearing",l:"Next hearing",t:"date"},
+      {k:"project_id",l:"Project",t:"ref",ref:"projects",show:"name"},
+      {k:"lawyer_id",l:"Lawyer",t:"ref",ref:"lawyers",show:"name"},{k:"notes",l:"Notes",t:"textarea"}],
+    cols:["case_number","title","status","date_filed","next_hearing","lawyer_id"]},
+  issues:{label:"Issues", table:"lmis_issues", docs:true, statusF:["pending","resolved"],
+    fields:[{k:"title",l:"Issue",req:1},{k:"description",l:"Description",t:"textarea"},
+      {k:"case_id",l:"Linked case",t:"ref",ref:"cases",show:"title"},
+      {k:"status",l:"Status",t:"select",o:["pending","resolved"]},
+      {k:"resolution_note",l:"How it was resolved",t:"textarea"}],
+    cols:["title","case_id","status","created_at"]},
+  agreements:{label:"Agreements", table:"lmis_agreements", docs:true, statusF:["drafting","signing","signed"],
+    fields:[{k:"title",l:"Agreement",req:1},{k:"counterparty",l:"Counterparty"},
+      {k:"project_id",l:"Project",t:"ref",ref:"projects",show:"name"},
+      {k:"status",l:"Status",t:"select",o:["drafting","signing","signed"]},
+      {k:"signing_date",l:"Signing date",t:"date"},
+      {k:"lawyer_id",l:"Lawyer",t:"ref",ref:"lawyers",show:"name"}],
+    cols:["title","project_id","counterparty","status","signing_date"]},
+  lawyers:{label:"Lawyers", table:"lmis_lawyers",
+    fields:[{k:"name",l:"Name",req:1},{k:"type",l:"Type",t:"select",o:["internal","external","state_law_office"]},
+      {k:"firm",l:"Firm / office"},{k:"email",l:"Email"},{k:"phone",l:"Phone"}],
+    cols:["name","type","firm","phone","_projects"]},
+  projects:{label:"Projects", table:"lmis_projects",
+    fields:[{k:"name",l:"Project name",req:1},{k:"location",l:"Location"},
+      {k:"status",l:"Status",t:"select",o:["planning","ongoing","completed"]},{k:"notes",l:"Notes",t:"textarea"}],
+    cols:["name","location","status","_lawyers"]},
+  assignments:{label:"Assignments", table:"lmis_assignments",
+    fields:[{k:"lawyer_id",l:"Lawyer",t:"ref",ref:"lawyers",show:"name",req:1},
+      {k:"project_id",l:"Project",t:"ref",ref:"projects",show:"name",req:1},{k:"role",l:"Role on project"}],
+    cols:["lawyer_id","project_id","role"]},
+  expenses:{label:"Expenses", table:"lmis_expenses", docs:true,
+    fields:[{k:"description",l:"What was it for",req:1},{k:"amount",l:"Amount",t:"number"},
+      {k:"spent_on",l:"Date",t:"date"},
+      {k:"case_id",l:"Case",t:"ref",ref:"cases",show:"title"},
+      {k:"lawyer_id",l:"Lawyer",t:"ref",ref:"lawyers",show:"name"}],
+    cols:["description","case_id","lawyer_id","amount","spent_on"]},
+  users:{label:"Users", table:"lmis_profiles", adminOnly:true, noAdd:true,
+    fields:[{k:"full_name",l:"Name",ro:1},{k:"email",l:"Email",ro:1},
+      {k:"role",l:"Role",t:"select",o:["admin","lawyer","viewer"]}],
+    cols:["full_name","email","role"]}
+};
+const KEY = {cases:"lmis_cases",issues:"lmis_issues",agreements:"lmis_agreements",lawyers:"lmis_lawyers",
+  projects:"lmis_projects",assignments:"lmis_assignments",expenses:"lmis_expenses",users:"lmis_profiles"};
+
+// ----- auth -----
+$("toggleMode").onclick = () => {
+  signup = !signup;
+  $("nameWrap").style.display = signup ? "block" : "none";
+  $("goBtn").textContent = signup ? "Sign up" : "Sign in";
+  $("toggleMode").textContent = signup ? "I have an account" : "Create account";
+};
+$("goBtn").onclick = async () => {
+  $("loginMsg").textContent = "";
+  if (!sb) return $("loginMsg").textContent = NOT_CONFIGURED;
+  const email = $("email").value.trim(), password = $("pass").value;
+  const r = signup
+    ? await sb.auth.signUp({email, password, options:{data:{full_name:$("fullName").value.trim()}}})
+    : await sb.auth.signInWithPassword({email, password});
+  if (r.error) return $("loginMsg").textContent = r.error.message;
+  if (signup && !r.data.session) return $("loginMsg").textContent = "Check your email to confirm, then sign in.";
+  boot();
+};
+$("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function boot() {
+  if (!sb) { $("loginMsg").textContent = NOT_CONFIGURED; return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session) return;
+  const {data} = await sb.from("lmis_profiles").select("*").eq("id", session.user.id).single();
+  me = data || {role:"viewer", full_name:session.user.email};
+  $("login").style.display = "none"; $("app").style.display = "block";
+  $("who").textContent = `${me.full_name} (${me.role})`;
+  await load(); buildNav(); render();
+}
+async function load() {
+  for (const k in KEY) {
+    if (E[k].adminOnly && me.role !== "admin") { db[k] = []; continue; }
+    const {data} = await sb.from(KEY[k]).select("*").order("created_at",{ascending:false});
+    db[k] = data || [];
+  }
+  await Promise.all(["cases","lawyers"].map(async ent => {
+    await Promise.all(db[ent].filter(row => row.profile_image_path).map(async row => {
+      const {data, error} = await sb.storage.from("lmis-docs").createSignedUrl(row.profile_image_path, 300);
+      if (error) return console.error(`Unable to load ${ent} profile picture:`, error.message);
+      row._profileUrl = data?.signedUrl || "";
+    }));
+  }));
+}
+function buildNav() {
+  const items = [["dashboard","Dashboard"], ...Object.keys(E).filter(k => !(E[k].adminOnly && me.role !== "admin")).map(k => [k, E[k].label])];
+  $("nav").innerHTML = items.map(([k,l]) => `<button data-t="${k}" class="${k===tab?"on":""}">${l}</button>`).join("");
+  $("nav").querySelectorAll("button").forEach(b => b.onclick = () => { tab = b.dataset.t; $("gsearch").value=""; buildNav(); render(); });
+}
+
+// ----- helpers -----
+const byId = (t,id) => (db[t]||[]).find(x => x.id === id);
+function label(ent, row) { const m = {cases:"title",issues:"title",agreements:"title",lawyers:"name",projects:"name",expenses:"description"}; return row?.[m[ent]] || ""; }
+function namedWithAvatar(row, name) {
+  const text = esc(name) || "-";
+  if (!row?.profile_image_path) return text;
+  const initials = esc(String(name || "?").trim().charAt(0).toUpperCase());
+  return row._profileUrl
+    ? `<img class="avatar" src="${esc(row._profileUrl)}" alt="">${text}`
+    : `<span class="avatar avatar-fallback">${initials}</span>${text}`;
+}
+function cell(ent, row, c) {
+  if (c === "_projects") return esc(db.assignments.filter(a => a.lawyer_id === row.id).map(a => byId("projects",a.project_id)?.name).filter(Boolean).join(", ")) || "-";
+  if (c === "_lawyers") {
+    const lawyers = db.assignments.filter(a => a.project_id === row.id).map(a => byId("lawyers",a.lawyer_id)).filter(Boolean);
+    return lawyers.length ? lawyers.map(lawyer => namedWithAvatar(lawyer, lawyer.name)).join(", ") : "-";
+  }
+  const f = E[ent].fields.find(f => f.k === c); const v = row[c];
+  if (f?.t === "ref") {
+    const referenced = byId(f.ref, v);
+    return f.ref === "lawyers" ? namedWithAvatar(referenced, label(f.ref, referenced)) : esc(label(f.ref, referenced)) || "-";
+  }
+  if ((ent === "lawyers" && c === "name") || (ent === "cases" && c === "title")) return namedWithAvatar(row, v);
+  if (c === "status" || c === "role" && ent==="users") return `<span class="tag ${esc(v)}">${esc(v)}</span>`;
+  if (c === "amount") return Number(v||0).toLocaleString("en-KE",{style:"currency",currency:"KES"});
+  if (c === "created_at" && v) return new Date(v).toLocaleDateString();
+  return esc(v) || "-";
+}
+const head = c => ({_projects:"Projects assigned",_lawyers:"Lawyers",lawyer_id:"Lawyer",project_id:"Project",case_id:"Case",case_number:"Case no.",created_at:"Raised",date_filed:"Filed",next_hearing:"Next hearing",signing_date:"Signing date",spent_on:"Date",full_name:"Name"}[c] || c.charAt(0).toUpperCase()+c.slice(1).replace(/_/g," "));
+
+// ----- screens -----
+function render() { tab === "dashboard" ? dash() : list(tab); }
+
+function dash() {
+  const c = db.cases, activeC = c.filter(x => x.status==="active").length;
+  const spend = db.expenses.reduce((s,x) => s + Number(x.amount||0), 0);
+  const upcoming = c.filter(x => x.next_hearing && x.next_hearing >= new Date().toISOString().slice(0,10) && x.status!=="resolved")
+    .sort((a,b) => a.next_hearing.localeCompare(b.next_hearing)).slice(0,5);
+  $("main").innerHTML = `
+  <div class="grid">
+    <div class="stat"><b>${activeC}</b><span>Active cases</span></div>
+    <div class="stat"><b>${c.filter(x=>x.status==="pending").length}</b><span>Pending cases</span></div>
+    <div class="stat"><b>${c.filter(x=>x.status==="resolved").length}</b><span>Resolved cases</span></div>
+    <div class="stat"><b>${db.issues.filter(x=>x.status==="pending").length}</b><span>Pending issues</span></div>
+    <div class="stat"><b>${db.agreements.filter(x=>x.status==="signing").length}</b><span>Agreements being signed</span></div>
+    <div class="stat"><b style="font-size:20px">${spend.toLocaleString("en-KE",{style:"currency",currency:"KES",maximumFractionDigits:0})}</b><span>Lawyer expenses logged</span></div>
+  </div>
+  <h3>Upcoming hearings</h3>
+  <div class="tablewrap">${upcoming.length ? `<table>${upcoming.map(x => `<tr class="row" data-e="cases" data-id="${x.id}"><td>${esc(x.next_hearing)}</td><td>${namedWithAvatar(x, x.title)}</td><td>${esc(x.court)}</td></tr>`).join("")}</table>` : `<div class="empty">No upcoming hearings set.</div>`}</div>`;
+  bindRows();
+}
+
+function list(ent) {
+  const cfg = E[ent];
+  $("main").innerHTML = `
+  <div class="bar">
+    <input id="q" placeholder="Search ${cfg.label.toLowerCase()}..." style="max-width:300px">
+    ${cfg.statusF ? `<select id="sf"><option value="">All statuses</option>${cfg.statusF.map(s=>`<option>${s}</option>`).join("")}</select>` : ""}
+    <span class="sp"></span>
+    ${canEdit() && !cfg.noAdd ? `<button class="btn" id="add">+ Add</button>` : ""}
+  </div>
+  <div class="tablewrap" id="tbl"></div>`;
+  const draw = () => {
+    const q = $("q").value.toLowerCase(), sf = $("sf")?.value;
+    const rows = db[ent].filter(r => (!sf || r.status === sf) && (!q || JSON.stringify(Object.values(r)).toLowerCase().includes(q) || cfg.cols.some(c => cell(ent,r,c).toLowerCase().includes(q))));
+    $("tbl").innerHTML = rows.length
+      ? `<table><tr>${cfg.cols.map(c=>`<th>${head(c)}</th>`).join("")}</tr>${rows.map(r=>`<tr class="row" data-e="${ent}" data-id="${r.id}">${cfg.cols.map(c=>`<td>${cell(ent,r,c)}</td>`).join("")}</tr>`).join("")}</table>`
+      : `<div class="empty">Nothing here yet.</div>`;
+    bindRows();
+  };
+  $("q").oninput = draw; if ($("sf")) $("sf").onchange = draw;
+  if ($("add")) $("add").onclick = () => form(ent);
+  draw();
+}
+function bindRows() { document.querySelectorAll("tr.row").forEach(r => r.onclick = () => form(r.dataset.e, r.dataset.id)); }
+
+// ----- add / edit form -----
+async function form(ent, id) {
+  const cfg = E[ent], row = id ? byId(ent, id) : {};
+  const ro = !canEdit() || (cfg.adminOnly && me.role !== "admin");
+  const profileEntity = ["cases","lawyers"].includes(ent);
+  const inputs = cfg.fields.map(f => {
+    const v = row[f.k] ?? "", dis = (ro || f.ro) ? "disabled" : "";
+    let el;
+    if (f.t === "select") el = `<select id="f_${f.k}" ${dis}>${f.o.map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`;
+    else if (f.t === "ref") el = `<select id="f_${f.k}" ${dis}><option value="">-</option>${db[f.ref].map(o=>`<option value="${o.id}" ${o.id===v?"selected":""}>${esc(label(f.ref,o))}</option>`).join("")}</select>`;
+    else if (f.t === "textarea") el = `<textarea id="f_${f.k}" rows="3" ${dis}>${esc(v)}</textarea>`;
+    else el = `<input id="f_${f.k}" type="${f.t||"text"}" step="any" value="${esc(v)}" ${dis}>`;
+    return `<label>${f.l}</label>${el}`;
+  }).join("");
+  $("box").innerHTML = `<h2>${id ? "Edit" : "New"} ${cfg.label.replace(/s$/,"")}</h2>${inputs}
+    ${profileEntity ? `<div class="docs"><b style="font-size:13px">${ent === "lawyers" ? "Profile picture" : "Case picture"}</b>${row.profile_image_path ? `<div id="profilePreview"></div>` : ""}${!ro ? `<input type="file" id="profileFile" accept="image/*" style="margin-top:8px"><div style="font-size:12px;color:var(--mute);margin-top:4px">Images only, up to 5 MB. Save to upload.</div>` : ""}</div>` : ""}
+    ${cfg.docs && id ? `<div class="docs"><b style="font-size:13px">Documents</b><div id="doclist"></div>${canEdit()?`<input type="file" id="file" style="margin-top:8px">`:""}</div>` : ""}
+    ${cfg.docs && !id ? `<div style="font-size:12px;color:var(--mute);margin-top:12px">Save first, then reopen to attach documents.</div>` : ""}
+    <div class="msg" id="fmsg"></div>
+    <div class="acts">
+      ${id && canEdit() && !cfg.adminOnly ? `<button class="btn danger" id="del">Delete</button>` : ""}
+      ${id && ["cases","lawyers","projects"].includes(ent) ? `<button class="btn ghost" id="download">Download details</button>` : ""}
+      <button class="btn ghost" id="cancel">Close</button>
+      ${!ro ? `<button class="btn" id="save">Save</button>` : ""}
+    </div>`;
+  $("modal").style.display = "flex";
+  $("cancel").onclick = closeM;
+  if (id && profileEntity && row.profile_image_path) showProfileImage(row.profile_image_path);
+  if ($("download")) $("download").onclick = () => downloadDetails(ent, row);
+  if (id && cfg.docs) { docList(ent, id); if ($("file")) $("file").onchange = e => upload(ent, id, e.target.files[0]); }
+  if ($("save")) $("save").onclick = async () => {
+    const p = {};
+    for (const f of cfg.fields) {
+      if (f.ro) continue;
+      let v = $("f_"+f.k).value;
+      if (v === "") v = null;
+      if (f.req && v === null) return $("fmsg").textContent = `${f.l} is required`;
+      if (f.t === "number" && v !== null) v = Number(v);
+      p[f.k] = v;
+    }
+    if (ent === "issues") p.resolved_at = p.status === "resolved" ? (row.resolved_at || new Date().toISOString()) : null;
+    const profileFile = $("profileFile")?.files[0];
+    if (profileFile && (!profileFile.type.startsWith("image/") || profileFile.size > 5 * 1024 * 1024)) {
+      return $("fmsg").textContent = "Choose an image file smaller than 5 MB.";
+    }
+    const r = id
+      ? await sb.from(cfg.table).update(p).eq("id", id)
+      : await sb.from(cfg.table).insert(p).select().single();
+    if (r.error) return $("fmsg").textContent = r.error.message;
+    const savedId = id || r.data.id;
+    if (profileFile) {
+      const profileResult = await uploadProfileImage(ent, savedId, profileFile);
+      if (profileResult.error) return $("fmsg").textContent = profileResult.error;
+    }
+    closeM(); await load(); render();
+  };
+  if ($("del")) $("del").onclick = async () => {
+    if (!confirm("Delete this record?")) return;
+    const r = await sb.from(cfg.table).delete().eq("id", id);
+    if (r.error) return $("fmsg").textContent = r.error.message;
+    closeM(); await load(); render();
+  };
+}
+function closeM() { $("modal").style.display = "none"; }
+$("modal").onclick = e => { if (e.target === $("modal")) closeM(); };
+
+// ----- documents -----
+async function docList(ent, id) {
+  const {data} = await sb.from("lmis_documents").select("*").eq("parent_type", ent).eq("parent_id", id).order("created_at");
+  $("doclist").innerHTML = (data||[]).map(d => `<a data-p="${esc(d.path)}">${esc(d.name)}</a>`).join("") || `<div style="color:var(--mute);font-size:13px;padding:6px 0">No documents yet.</div>`;
+  $("doclist").querySelectorAll("a").forEach(a => a.onclick = async () => {
+    const {data:u} = await sb.storage.from("lmis-docs").createSignedUrl(a.dataset.p, 120);
+    if (u?.signedUrl) window.open(u.signedUrl, "_blank");
+  });
+}
+async function showProfileImage(path) {
+  const {data, error} = await sb.storage.from("lmis-docs").createSignedUrl(path, 300);
+  if (error) return $("fmsg").textContent = error.message;
+  if (data?.signedUrl && $("profilePreview")) $("profilePreview").innerHTML = `<img class="profile-preview" src="${esc(data.signedUrl)}" alt="Profile picture">`;
+}
+async function uploadProfileImage(ent, id, file) {
+  const path = `profiles/${ent}/${id}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,"_")}`;
+  const up = await sb.storage.from("lmis-docs").upload(path, file);
+  if (up.error) return {error:up.error.message};
+  const r = await sb.from(E[ent].table).update({profile_image_path:path}).eq("id", id);
+  if (r.error) return {error:r.error.message};
+  return {path};
+}
+function downloadDetails(ent, row) {
+  const lines = [`${E[ent].label.replace(/s$/,"")} details`, `Generated: ${new Date().toLocaleString()}`, ""];
+  E[ent].fields.forEach(f => {
+    let value = row[f.k];
+    if (f.t === "ref" && value) value = label(f.ref, byId(f.ref, value));
+    if (value === null || value === undefined || value === "") value = "-";
+    lines.push(`${f.l}: ${value}`);
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/plain;charset=utf-8"});
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${(label(ent,row) || ent).replace(/[^\w\-]+/g,"_")}-details.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+async function upload(ent, id, file) {
+  if (!file) return;
+  $("fmsg").textContent = "Uploading...";
+  const path = `${ent}/${id}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,"_")}`;
+  const up = await sb.storage.from("lmis-docs").upload(path, file);
+  if (up.error) return $("fmsg").textContent = up.error.message;
+  const r = await sb.from("lmis_documents").insert({parent_type: ent, parent_id: id, name: file.name, path});
+  $("fmsg").textContent = r.error ? r.error.message : "";
+  docList(ent, id);
+}
+
+// ----- global search -----
+$("gsearch").oninput = e => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) return render();
+  const groups = ["cases","issues","lawyers","projects","agreements","expenses"].map(ent => {
+    const hits = db[ent].filter(r => JSON.stringify(Object.values(r)).toLowerCase().includes(q));
+    return hits.length ? `<div class="sr"><h3>${E[ent].label} (${hits.length})</h3>${hits.slice(0,8).map(r=>`<div data-e="${ent}" data-id="${r.id}">${["cases","lawyers"].includes(ent) ? namedWithAvatar(r, label(ent,r)) : esc(label(ent,r))}</div>`).join("")}</div>` : "";
+  }).join("");
+  $("main").innerHTML = groups || `<div class="empty">No results for "${esc(q)}".</div>`;
+  $("main").querySelectorAll(".sr div").forEach(d => d.onclick = () => form(d.dataset.e, d.dataset.id));
+};
+
+boot();
+</script>
+</body>
+</html>
